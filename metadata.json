@@ -1,0 +1,6 @@
+{
+  "name": "WorkPilot",
+  "description": "Local-first desktop application for IT Engineering Ops to reduce daily work tracking typing.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
