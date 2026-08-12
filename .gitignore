@@ -9,3 +9,10 @@ coverage/
 
 __pycache__/
 *.pyc
+
+# Tauri generated files
+src-tauri/target/
+src-tauri/gen/
+
+# Locally built Windows sidecar
+src-tauri/binaries/workpilot-backend-*.exe
