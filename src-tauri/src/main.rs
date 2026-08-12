@@ -137,7 +137,7 @@ fn main() {
                         let _ = child.wait();
                         println!("[Tauri] Sidecar process terminated successfully.");
                     }
-                }
+                };
             }
             _ => {}
         });
