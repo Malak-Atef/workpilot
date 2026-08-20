@@ -225,13 +225,129 @@ export const WeeklyWorkPlanView: React.FC = () => {
   const handleNextWeek = () => setWeekOffset(prev => prev + 1);
   const handleTodayWeek = () => setWeekOffset(0);
 
-  // Trigger browser print dialog
+  // دالة جديدة لطباعة التقرير بشكل احترافي عبر فتح نافذة جديدة وتوليد HTML
   const handlePrint = () => {
-    try {
-      window.print();
-    } catch (e) {
-      console.error('Failed to trigger window.print():', e);
+    // بناء صفوف الجدول كـ HTML
+    let tableRows = '';
+    TIME_SLOTS.forEach(slot => {
+      tableRows += `<tr>`;
+      tableRows += `<td class="time-cell">${slot.label}</td>`;
+      weekDays.forEach(day => {
+        const items = getItemsForSlot(day.dateStr, slot.value);
+        let cellContent = '';
+        items.forEach(item => {
+          const startMins = timeToMinutes(item.startTime);
+          const slotMins = timeToMinutes(slot.value);
+          const isStarting = startMins !== null && slotMins !== null && startMins >= slotMins && startMins < slotMins + 30;
+          
+          if (isStarting) {
+            const catStyle = getCategoryStyle(item.category);
+            const statusClass = item.isCompleted ? 'completed' : 'planned';
+            const statusLabel = item.isCompleted ? '✓ Completed' : 'Planned';
+            const timeRange = formatTimeRange(item.startTime, item.endTime);
+            
+            cellContent += `
+              <div class="task-card ${statusClass}">
+                <div class="task-header">
+                  <span class="task-title"><strong>${item.title}</strong></span>
+                  <span class="category-tag" style="background:${catStyle.printBg}; color:${catStyle.printText}; border:1px solid ${catStyle.printBorder};">${item.category}</span>
+                </div>
+                <div class="task-meta">
+                  <span class="status-badge ${statusClass}">${statusLabel}</span>
+                  ${timeRange ? `<span class="time-range">🕒 ${timeRange}</span>` : ''}
+                  ${item.durationHours ? `<span class="duration">⏱ ${item.durationHours}h logged</span>` : ''}
+                  ${item.location ? `<span class="location">📍 ${item.location}</span>` : ''}
+                </div>
+                ${item.description ? `<div class="description">${item.description}</div>` : ''}
+              </div>
+            `;
+          }
+        });
+        tableRows += `<td class="day-cell">${cellContent || '&nbsp;'}</td>`;
+      });
+      tableRows += `</tr>`;
+    });
+
+    // فتح نافذة جديدة (Popup) خاصة للطباعة
+    const printWindow = window.open('', '', 'height=800,width=1100');
+    if (!printWindow) {
+      alert('الرجاء السماح للنوافذ المنبثقة لطباعة التقرير.');
+      return;
     }
+
+    const dateStr = new Date().toLocaleDateString();
+    
+    // كتابة صفحة HTML كاملة بستايل مخصص للطباعة
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Weekly Work Plan - Print</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 30px; background: white; color: black; }
+            h1 { font-size: 24px; margin-bottom: 5px; color: #111; }
+            .sub-header { display: flex; gap: 20px; font-size: 14px; color: #555; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; }
+            .goal-box { background: #f9fafb; padding: 10px 15px; border-left: 4px solid #2563eb; margin-bottom: 20px; font-size: 14px; }
+            
+            table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 10px; }
+            th, td { border: 1px solid #000; padding: 6px; vertical-align: top; }
+            th { background: #f0f0f0; font-weight: bold; text-align: center; }
+            .time-cell { font-weight: bold; background: #fafafa; width: 80px; text-align: center; }
+            .day-cell { min-height: 60px; }
+            
+            .task-card { border: 1px solid #ccc; border-radius: 4px; padding: 6px; margin-bottom: 4px; background: white; }
+            .task-card.planned { border-left: 4px solid #2563eb; }
+            .task-card.completed { border-left: 4px solid #16a34a; background: #f9f9f9; }
+            
+            .task-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; gap: 8px; }
+            .task-title { font-size: 12px; flex: 1; }
+            .category-tag { font-size: 9px; font-weight: bold; padding: 2px 6px; border-radius: 4px; white-space: nowrap; }
+            
+            .task-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+            .status-badge { font-size: 9px; font-weight: bold; padding: 1px 6px; border-radius: 10px; }
+            .status-badge.planned { background: #dbeafe; color: #1e40af; }
+            .status-badge.completed { background: #dcfce7; color: #166534; }
+            .time-range, .duration, .location { font-size: 10px; color: #555; }
+            .description { font-size: 10px; font-style: italic; color: #444; margin-top: 2px; padding-top: 2px; border-top: 1px dashed #eee; }
+
+            @media print {
+              body { margin: 0.4in; }
+            }
+          </style>
+        </head>
+        <body>
+          <h1>Malak's Weekly IT Work & Activity Report</h1>
+          <div class="sub-header">
+            <span>Week Period: <b>${weekStart}</b> to <b>${weekEnd}</b></span>
+            <span>Total Logged: <b>${totalLoggedHours.toFixed(1)}h</b></span>
+            <span>Completed: <b>${completedItemsCount}</b></span>
+            <span>Planned: <b>${plannedItemsCount}</b></span>
+          </div>
+          
+          ${currentWeekMeta.weekGoal ? `<div class="goal-box"><b>Weekly Goal:</b> ${currentWeekMeta.weekGoal}</div>` : ''}
+          
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                ${weekDays.map(d => `<th>${d.dayName} <br/><span style="font-weight:normal; color:#555;">${d.monthName} ${d.dayNum}</span></th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>
+              ${tableRows}
+            </tbody>
+          </table>
+
+          <div style="margin-top: 20px; font-size: 11px; color: #888; border-top: 1px solid #ddd; padding-top: 10px;">
+            <p>Generated on ${dateStr} via WorkPilot IT Engineering Ops</p>
+          </div>
+          <script>
+            // فتح الطباعة تلقائياً بمجرد تحميل الصفحة
+            window.onload = function() { window.print(); }
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   // Build aggregated work items combining PlannedItems and WorkLogs
@@ -581,67 +697,7 @@ export const WeeklyWorkPlanView: React.FC = () => {
 
   return (
     <div className="p-6 space-y-6 max-w-[1600px] mx-auto select-none">
-      <style>{`
-       @media print {
-  @page {
-    size: A4 portrait; /* تغيير من landscape لتقليل العرض الزائد */
-    margin: 15mm;      /* زيادة الهوامش لمنع التصاق النص بالحواف */
-  }
-  body, #root {
-    background-color: #ffffff !important;
-    color: #000000 !important;
-    font-family: 'Segoe UI', Arial, sans-serif !important;
-  }
-  aside, nav, .no-print, header {
-    display: none !important;
-  }
-  .print\:hidden {
-    display: none !important;
-  }
-  .printable-document {
-    background: #ffffff !important;
-    color: #000000 !important;
-    border: 1px solid #e5e7eb !important;
-    box-shadow: none !important;
-    width: 100% !important;
-    border-radius: 4px !important;
-    padding: 0 !important;
-  }
-  /* جداول الطباعة */
-  .printable-document table {
-    border: 1px solid #000 !important;
-    width: 100% !important;
-    font-size: 9px !important; /* تقليل حجم الخط قليلاً للحفاظ على التنسيق داخل المربعات */
-    border-collapse: collapse !important;
-  }
-  .printable-document th {
-    background-color: #f3f4f6 !important;
-    color: #000 !important;
-    border: 1px solid #000 !important;
-    font-weight: bold !important;
-    padding: 4px 6px !important;
-  }
-  .printable-document td {
-    border: 1px solid #000 !important;
-    padding: 4px !important;
-    vertical-align: top !important;
-  }
-  /* منع كسر المهام داخل الخلايا (هام جداً) */
-  .printable-document td > div {
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-  }
-  /* تحسين ألوان المهام المطبوعة لتبدو احترافية */
-  .printable-document .bg-blue-500\/10 { background-color: #eff6ff !important; border: 1px solid #bfdbfe !important; }
-  .printable-document .bg-amber-500\/10 { background-color: #fef3c7 !important; border: 1px solid #fde68a !important; }
-  .printable-document .bg-purple-500\/10 { background-color: #f3e8ff !important; border: 1px solid #e9d5ff !important; }
-  .printable-document .bg-emerald-500\/10 { background-color: #d1fae5 !important; border: 1px solid #a7f3d0 !important; }
-  .printable-document .bg-rose-500\/10 { background-color: #ffe4e6 !important; border: 1px solid #fecdd3 !important; }
-  
-  /* إخفاء النصوص والرسومات التي لا تهم في الطباعة داخل الخلايا */
-  .printable-document .absolute { display: none !important; }
-}
-      `}</style>
+      <style>{``}</style>
 
       {/* Outer Quick Action & Navigation Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#181920] p-5 rounded-2xl border border-[#292931] no-print shadow-lg">
@@ -1272,4 +1328,3 @@ export const WeeklyWorkPlanView: React.FC = () => {
 };
 
 export default WeeklyWorkPlanView;
-
