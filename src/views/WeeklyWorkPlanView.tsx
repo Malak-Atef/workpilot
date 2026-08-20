@@ -582,56 +582,65 @@ export const WeeklyWorkPlanView: React.FC = () => {
   return (
     <div className="p-6 space-y-6 max-w-[1600px] mx-auto select-none">
       <style>{`
-        @media print {
-          @page {
-            size: A4 landscape;
-            margin: 10mm;
-          }
-          body, #root {
-            background-color: #ffffff !important;
-            color: #000000 !important;
-            font-family: Arial, Helvetica, sans-serif !important;
-          }
-          aside, nav, .no-print, header {
-            display: none !important;
-          }
-          .print\\:hidden {
-            display: none !important;
-          }
-          .print\\:block {
-            display: block !important;
-          }
-          .printable-document {
-            background: #ffffff !important;
-            color: #000000 !important;
-            border: 1.5px solid #111827 !important;
-            box-shadow: none !important;
-            width: 100% !important;
-            max-width: 100% !important;
-            border-radius: 0 !important;
-          }
-          .printable-document * {
-            color: #000000 !important;
-            border-color: #d1d5db !important;
-            background-color: transparent !important;
-          }
-          .printable-document table {
-            border: 1.5px solid #111827 !important;
-            width: 100% !important;
-          }
-          .printable-document th {
-            background-color: #f3f4f6 !important;
-            color: #111827 !important;
-            border: 1px solid #9ca3af !important;
-            font-weight: bold !important;
-          }
-          .printable-document td {
-            border: 1px solid #d1d5db !important;
-          }
-          .printable-document tr {
-            page-break-inside: avoid !important;
-          }
-        }
+       @media print {
+  @page {
+    size: A4 portrait; /* تغيير من landscape لتقليل العرض الزائد */
+    margin: 15mm;      /* زيادة الهوامش لمنع التصاق النص بالحواف */
+  }
+  body, #root {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    font-family: 'Segoe UI', Arial, sans-serif !important;
+  }
+  aside, nav, .no-print, header {
+    display: none !important;
+  }
+  .print\:hidden {
+    display: none !important;
+  }
+  .printable-document {
+    background: #ffffff !important;
+    color: #000000 !important;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: none !important;
+    width: 100% !important;
+    border-radius: 4px !important;
+    padding: 0 !important;
+  }
+  /* جداول الطباعة */
+  .printable-document table {
+    border: 1px solid #000 !important;
+    width: 100% !important;
+    font-size: 9px !important; /* تقليل حجم الخط قليلاً للحفاظ على التنسيق داخل المربعات */
+    border-collapse: collapse !important;
+  }
+  .printable-document th {
+    background-color: #f3f4f6 !important;
+    color: #000 !important;
+    border: 1px solid #000 !important;
+    font-weight: bold !important;
+    padding: 4px 6px !important;
+  }
+  .printable-document td {
+    border: 1px solid #000 !important;
+    padding: 4px !important;
+    vertical-align: top !important;
+  }
+  /* منع كسر المهام داخل الخلايا (هام جداً) */
+  .printable-document td > div {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+  /* تحسين ألوان المهام المطبوعة لتبدو احترافية */
+  .printable-document .bg-blue-500\/10 { background-color: #eff6ff !important; border: 1px solid #bfdbfe !important; }
+  .printable-document .bg-amber-500\/10 { background-color: #fef3c7 !important; border: 1px solid #fde68a !important; }
+  .printable-document .bg-purple-500\/10 { background-color: #f3e8ff !important; border: 1px solid #e9d5ff !important; }
+  .printable-document .bg-emerald-500\/10 { background-color: #d1fae5 !important; border: 1px solid #a7f3d0 !important; }
+  .printable-document .bg-rose-500\/10 { background-color: #ffe4e6 !important; border: 1px solid #fecdd3 !important; }
+  
+  /* إخفاء النصوص والرسومات التي لا تهم في الطباعة داخل الخلايا */
+  .printable-document .absolute { display: none !important; }
+}
       `}</style>
 
       {/* Outer Quick Action & Navigation Header */}
@@ -849,15 +858,15 @@ export const WeeklyWorkPlanView: React.FC = () => {
                             const catStyle = getCategoryStyle(item.category);
                             return (
                               <div
-                                key={item.id}
-                                className={`relative rounded-xl border transition-all shadow-md overflow-hidden ${
-                                  isStarting
-                                    ? item.isCompleted
-                                      ? 'bg-[#13221a] border-[#22543d] text-[#f1f5f9]'
-                                      : 'bg-[#1a2333] border-[#2b4c7e] text-[#f1f5f9]'
-                                    : 'bg-[#161c28]/70 border-[#272730] text-[#a1a1aa]'
-                                }`}
-                              >
+                                  key={item.id}
+                                  className={`relative rounded-xl border transition-all shadow-md overflow-hidden break-inside-avoid print:break-inside-avoid ${
+                                    isStarting
+                                      ? item.isCompleted
+                                        ? 'bg-[#13221a] border-[#22543d] text-[#f1f5f9]'
+                                        : 'bg-[#1a2333] border-[#2b4c7e] text-[#f1f5f9]'
+                                      : 'bg-[#161c28]/70 border-[#272730] text-[#a1a1aa]'
+                                  }`}
+                                >
                                 {isStarting ? (
                                   <div className="p-3 pl-4 space-y-1.5">
                                     {/* Left Accent Color Strip */}
