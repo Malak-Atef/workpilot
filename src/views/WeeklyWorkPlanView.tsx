@@ -226,8 +226,9 @@ export const WeeklyWorkPlanView: React.FC = () => {
   const handleTodayWeek = () => setWeekOffset(0);
 
   // دالة جديدة لطباعة التقرير بشكل احترافي عبر فتح نافذة جديدة وتوليد HTML
+  // دالة جديدة لطباعة التقرير باستخدام Iframe (بدون نافذة منبثقة)
   const handlePrint = () => {
-    // بناء صفوف الجدول كـ HTML
+    // بناء صفوف الجدول كـ HTML (نفس الكود السابق)
     let tableRows = '';
     TIME_SLOTS.forEach(slot => {
       tableRows += `<tr>`;
@@ -268,17 +269,10 @@ export const WeeklyWorkPlanView: React.FC = () => {
       tableRows += `</tr>`;
     });
 
-    // فتح نافذة جديدة (Popup) خاصة للطباعة
-    const printWindow = window.open('', '', 'height=800,width=1100');
-    if (!printWindow) {
-      alert('الرجاء السماح للنوافذ المنبثقة لطباعة التقرير.');
-      return;
-    }
-
     const dateStr = new Date().toLocaleDateString();
-    
-    // كتابة صفحة HTML كاملة بستايل مخصص للطباعة
-    printWindow.document.write(`
+
+    // توليد محتوى HTML للتقرير (نفس المحتوى)
+    const htmlContent = `
       <html>
         <head>
           <title>Weekly Work Plan - Print</title>
@@ -340,14 +334,31 @@ export const WeeklyWorkPlanView: React.FC = () => {
           <div style="margin-top: 20px; font-size: 11px; color: #888; border-top: 1px solid #ddd; padding-top: 10px;">
             <p>Generated on ${dateStr} via WorkPilot IT Engineering Ops</p>
           </div>
-          <script>
-            // فتح الطباعة تلقائياً بمجرد تحميل الصفحة
-            window.onload = function() { window.print(); }
-          </script>
         </body>
       </html>
-    `);
-    printWindow.document.close();
+    `;
+
+    // الحل الجذري: استخدام Iframe مخفي لطباعة المحتوى
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'absolute';
+    iframe.style.width = '0px';
+    iframe.style.height = '0px';
+    iframe.style.border = 'none';
+    document.body.appendChild(iframe);
+
+    // كتابة المحتوى داخل الـ Iframe
+    const iframeDoc = iframe.contentWindow?.document;
+    if (iframeDoc) {
+      iframeDoc.open();
+      iframeDoc.write(htmlContent);
+      iframeDoc.close();
+
+      // الانتظار قليلاً حتى يتم تحميل الصفحة ثم طباعتها
+      iframe.contentWindow?.focus();
+      setTimeout(() => {
+        iframe.contentWindow?.print();
+      }, 500);
+    }
   };
 
   // Build aggregated work items combining PlannedItems and WorkLogs
