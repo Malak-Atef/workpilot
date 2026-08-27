@@ -116,6 +116,27 @@ export function getCategoryStyle(category?: string) {
   };
 }
 
+
+export function getPrintDarkTheme(category?: string) {
+  const cat = (category || 'IT Ops').toLowerCase();
+  if (cat.includes('it op') || cat.includes('it')) {
+    return { text: '#93c5fd', bg: 'rgba(96,165,250,0.15)', border: 'rgba(96,165,250,0.45)' };
+  }
+  if (cat.includes('infr') || cat.includes('network') || cat.includes('server')) {
+    return { text: '#c4b5fd', bg: 'rgba(167,139,250,0.15)', border: 'rgba(167,139,250,0.45)' };
+  }
+  if (cat.includes('hard') || cat.includes('device') || cat.includes('laptop')) {
+    return { text: '#6ee7b7', bg: 'rgba(52,211,153,0.15)', border: 'rgba(52,211,153,0.45)' };
+  }
+  if (cat.includes('maint') || cat.includes('repair')) {
+    return { text: '#fcd34d', bg: 'rgba(251,191,36,0.15)', border: 'rgba(251,191,36,0.45)' };
+  }
+  if (cat.includes('sec') || cat.includes('admin')) {
+    return { text: '#fda4af', bg: 'rgba(251,113,133,0.15)', border: 'rgba(251,113,133,0.45)' };
+  }
+  return { text: '#a5b4fc', bg: 'rgba(129,140,248,0.15)', border: 'rgba(129,140,248,0.45)' };
+}
+
 function timeToMinutes(timeStr?: string): number | null {
   if (!timeStr) return null;
   const trimmed = timeStr.trim().toUpperCase();
@@ -228,7 +249,7 @@ export const WeeklyWorkPlanView: React.FC = () => {
   // دالة جديدة لطباعة التقرير بشكل احترافي عبر فتح نافذة جديدة وتوليد HTML
   // دالة جديدة لطباعة التقرير باستخدام Iframe (بدون نافذة منبثقة)
   const handlePrint = () => {
-    // بناء صفوف الجدول كـ HTML (نفس الكود السابق)
+    // Build the schedule grid rows for the print/PDF document
     let tableRows = '';
     TIME_SLOTS.forEach(slot => {
       tableRows += `<tr>`;
@@ -240,90 +261,418 @@ export const WeeklyWorkPlanView: React.FC = () => {
           const startMins = timeToMinutes(item.startTime);
           const slotMins = timeToMinutes(slot.value);
           const isStarting = startMins !== null && slotMins !== null && startMins >= slotMins && startMins < slotMins + 30;
-          
+
           if (isStarting) {
-            const catStyle = getCategoryStyle(item.category);
+            const theme = getPrintDarkTheme(item.category);
             const statusClass = item.isCompleted ? 'completed' : 'planned';
-            const statusLabel = item.isCompleted ? '✓ Completed' : 'Planned';
             const timeRange = formatTimeRange(item.startTime, item.endTime);
-            
+
             cellContent += `
               <div class="task-card ${statusClass}">
-                <div class="task-header">
-                  <span class="task-title"><strong>${item.title}</strong></span>
-                  <span class="category-tag" style="background:${catStyle.printBg}; color:${catStyle.printText}; border:1px solid ${catStyle.printBorder};">${item.category}</span>
+                <div class="task-card-top">
+                  <span class="task-title">${item.isCompleted ? '<span class="check-mark">&check;</span> ' : ''}${item.title}</span>
+                  <span class="category-pill" style="background:${theme.bg}; color:${theme.text}; border:1px solid ${theme.border};">${item.category}</span>
                 </div>
-                <div class="task-meta">
-                  <span class="status-badge ${statusClass}">${statusLabel}</span>
-                  ${timeRange ? `<span class="time-range">🕒 ${timeRange}</span>` : ''}
-                  ${item.durationHours ? `<span class="duration">⏱ ${item.durationHours}h logged</span>` : ''}
-                  ${item.location ? `<span class="location">📍 ${item.location}</span>` : ''}
+                <div class="task-meta-row">
+                  ${timeRange ? `<span class="task-time">${timeRange}</span>` : ''}
+                  ${item.durationHours ? `<span class="task-duration">${item.durationHours}h logged</span>` : ''}
+                  ${item.location ? `<span class="task-location">${item.location}</span>` : ''}
                 </div>
-                ${item.description ? `<div class="description">${item.description}</div>` : ''}
+                ${item.description ? `<div class="task-desc">${item.description}</div>` : ''}
               </div>
             `;
           }
         });
-        tableRows += `<td class="day-cell">${cellContent || '&nbsp;'}</td>`;
+        tableRows += `<td class="day-cell">${cellContent || ''}</td>`;
       });
       tableRows += `</tr>`;
     });
 
-    const dateStr = new Date().toLocaleDateString();
+    // Additional / unscheduled items grouped by day, so nothing that appears
+    // in the on-screen grid silently disappears from the printed report.
+    let unscheduledSection = '';
+    if (totalUnscheduledCount > 0) {
+      let cols = '';
+      weekDays.forEach(day => {
+        const items = getUnscheduledItems(day.dateStr);
+        if (items.length === 0) return;
+        let cards = '';
+        items.forEach(item => {
+          const theme = getPrintDarkTheme(item.category);
+          const statusClass = item.isCompleted ? 'completed' : 'planned';
+          cards += `
+            <div class="task-card compact ${statusClass}">
+              <div class="task-card-top">
+                <span class="task-title">${item.isCompleted ? '<span class="check-mark">&check;</span> ' : ''}${item.title}</span>
+                <span class="category-pill" style="background:${theme.bg}; color:${theme.text}; border:1px solid ${theme.border};">${item.category}</span>
+              </div>
+              ${item.durationHours ? `<div class="task-meta-row"><span class="task-duration">${item.durationHours}h logged</span></div>` : ''}
+            </div>
+          `;
+        });
+        cols += `
+          <div class="unscheduled-col">
+            <div class="unscheduled-col-title">${day.dayName}</div>
+            ${cards}
+          </div>
+        `;
+      });
+      unscheduledSection = `
+        <div class="section-block">
+          <h3 class="section-title">Additional &amp; Unscheduled Items</h3>
+          <div class="unscheduled-grid">${cols}</div>
+        </div>
+      `;
+    }
 
-    // توليد محتوى HTML للتقرير (نفس المحتوى)
+    // KPI metrics
+    const totalItemsCount = completedItemsCount + plannedItemsCount;
+    const completionRate = totalItemsCount > 0 ? Math.round((completedItemsCount / totalItemsCount) * 100) : 0;
+    const activeCategoriesCount = new Set(aggregatedWeekItems.map(i => i.category || 'General')).size;
+
+    let statusTag = 'IN PROGRESS';
+    if (weekOffset > 0) statusTag = 'UPCOMING';
+    else if (weekOffset < 0) statusTag = 'ARCHIVED';
+    else if (totalItemsCount > 0 && completionRate === 100) statusTag = 'COMPLETE';
+
+    const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const rangeLabel = `${weekDays[0].dayName}, ${weekDays[0].monthName} ${weekDays[0].dayNum} \u2013 ${weekDays[4].dayName}, ${weekDays[4].monthName} ${weekDays[4].dayNum}`;
+
+    const nextWeekItemsHtml = currentWeekMeta.nextWeekTasks.length > 0
+      ? currentWeekMeta.nextWeekTasks.map(t => `<li>${t}</li>`).join('')
+      : '<li class="empty-item">Nothing queued yet</li>';
+
+    const videoObsHtml = hasVideoObs
+      ? currentWeekMeta.videoObservations.map(v => `<li>${v}</li>`).join('')
+      : '<li class="empty-item">No observations logged</li>';
+
     const htmlContent = `
+      <!DOCTYPE html>
       <html>
         <head>
+          <meta charset="utf-8" />
           <title>Weekly Work Plan - Print</title>
           <style>
-            body { font-family: Arial, sans-serif; margin: 30px; background: white; color: black; }
-            h1 { font-size: 24px; margin-bottom: 5px; color: #111; }
-            .sub-header { display: flex; gap: 20px; font-size: 14px; color: #555; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; }
-            .goal-box { background: #f9fafb; padding: 10px 15px; border-left: 4px solid #2563eb; margin-bottom: 20px; font-size: 14px; }
-            
-            table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 10px; }
-            th, td { border: 1px solid #000; padding: 6px; vertical-align: top; }
-            th { background: #f0f0f0; font-weight: bold; text-align: center; }
-            .time-cell { font-weight: bold; background: #fafafa; width: 80px; text-align: center; }
-            .day-cell { min-height: 60px; }
-            
-            .task-card { border: 1px solid #ccc; border-radius: 4px; padding: 6px; margin-bottom: 4px; background: white; }
-            .task-card.planned { border-left: 4px solid #2563eb; }
-            .task-card.completed { border-left: 4px solid #16a34a; background: #f9f9f9; }
-            
-            .task-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; gap: 8px; }
-            .task-title { font-size: 12px; flex: 1; }
-            .category-tag { font-size: 9px; font-weight: bold; padding: 2px 6px; border-radius: 4px; white-space: nowrap; }
-            
-            .task-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
-            .status-badge { font-size: 9px; font-weight: bold; padding: 1px 6px; border-radius: 10px; }
-            .status-badge.planned { background: #dbeafe; color: #1e40af; }
-            .status-badge.completed { background: #dcfce7; color: #166534; }
-            .time-range, .duration, .location { font-size: 10px; color: #555; }
-            .description { font-size: 10px; font-style: italic; color: #444; margin-top: 2px; padding-top: 2px; border-top: 1px dashed #eee; }
+            * {
+              box-sizing: border-box;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
 
-            @media print {
-              body { margin: 0.4in; }
+            @page {
+              size: A4 landscape;
+              margin: 8mm 8mm 10mm 8mm;
+              /* Standards-based running footer. Renders in paged-media engines
+                 that support CSS @page margin boxes; browsers that ignore it
+                 still get the in-flow .print-footer block below. */
+              @bottom-left {
+                content: "Official Weekly IT & Operational Report";
+                font-size: 8px;
+                color: #71717a;
+              }
+              @bottom-right {
+                content: "Page " counter(page) " of " counter(pages);
+                font-size: 8px;
+                color: #71717a;
+              }
+            }
+
+            html, body {
+              margin: 0;
+              padding: 0;
+              background: #0f1117;
+              color: #f4f4f5;
+              font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
+            }
+
+            /* ---------- Header ---------- */
+            .doc-header {
+              padding-bottom: 8px;
+              margin-bottom: 10px;
+              border-bottom: 1px solid #272730;
+              page-break-inside: avoid;
+            }
+            .header-top {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              margin-bottom: 6px;
+            }
+            .badge {
+              font-size: 9px;
+              font-weight: 700;
+              letter-spacing: 0.08em;
+              color: #60a5fa;
+              background: rgba(96,165,250,0.12);
+              border: 1px solid rgba(96,165,250,0.4);
+              border-radius: 4px;
+              padding: 3px 8px;
+            }
+            .status-tag {
+              font-size: 9px;
+              font-weight: 700;
+              letter-spacing: 0.06em;
+              color: #34d399;
+              background: rgba(52,211,153,0.12);
+              border: 1px solid rgba(52,211,153,0.4);
+              border-radius: 4px;
+              padding: 3px 8px;
+            }
+            .doc-title {
+              font-size: 20px;
+              font-weight: 800;
+              margin: 2px 0 4px 0;
+              color: #ffffff;
+              letter-spacing: -0.01em;
+            }
+            .doc-meta {
+              font-size: 10.5px;
+              color: #a1a1aa;
+              display: flex;
+              align-items: center;
+              gap: 8px;
+            }
+            .doc-meta .divider { color: #3f3f46; }
+
+            /* ---------- KPI bar ---------- */
+            .kpi-bar {
+              display: grid;
+              grid-template-columns: repeat(5, 1fr);
+              gap: 8px;
+              margin: 10px 0;
+              page-break-inside: avoid;
+            }
+            .kpi-card {
+              background: #181920;
+              border: 1px solid #272730;
+              border-radius: 8px;
+              padding: 8px 10px;
+            }
+            .kpi-label {
+              display: block;
+              font-size: 8.5px;
+              text-transform: uppercase;
+              letter-spacing: 0.05em;
+              color: #a1a1aa;
+              margin-bottom: 3px;
+            }
+            .kpi-value {
+              display: block;
+              font-size: 17px;
+              font-weight: 800;
+              color: #60a5fa;
+            }
+
+            /* ---------- Weekly focus banner ---------- */
+            .focus-banner {
+              background: #181920;
+              border: 1px solid #272730;
+              border-left: 4px solid #ffb74d;
+              border-radius: 6px;
+              padding: 8px 12px;
+              margin-bottom: 10px;
+              page-break-inside: avoid;
+            }
+            .focus-label {
+              display: block;
+              font-size: 8.5px;
+              font-weight: 700;
+              letter-spacing: 0.06em;
+              color: #ffb74d;
+              margin-bottom: 2px;
+            }
+            .focus-text {
+              margin: 0;
+              font-size: 11.5px;
+              color: #f4f4f5;
+            }
+
+            /* ---------- Schedule grid ---------- */
+            table.schedule-grid {
+              width: 100%;
+              border-collapse: collapse;
+              font-size: 9.5px;
+              table-layout: fixed;
+            }
+            table.schedule-grid thead { display: table-header-group; }
+            table.schedule-grid tbody { display: table-row-group; }
+            table.schedule-grid tr { page-break-inside: avoid; }
+            table.schedule-grid th {
+              background: #181920;
+              border: 1px solid #272730;
+              padding: 6px;
+              text-align: left;
+              font-size: 10px;
+            }
+            table.schedule-grid th .day-date {
+              display: block;
+              font-weight: 400;
+              font-size: 9px;
+              color: #a1a1aa;
+              margin-top: 1px;
+            }
+            table.schedule-grid td {
+              border: 1px solid #272730;
+              padding: 4px;
+              vertical-align: top;
+            }
+            .time-cell {
+              width: 62px;
+              text-align: center;
+              font-weight: 600;
+              color: #a1a1aa;
+              background: #14151b;
+              white-space: nowrap;
+            }
+            .day-cell { min-width: 0; }
+
+            /* ---------- Task cards ---------- */
+            .task-card {
+              border-radius: 6px;
+              padding: 5px 6px;
+              margin-bottom: 3px;
+              page-break-inside: avoid;
+            }
+            .task-card.completed { background: #13221a; border: 1px solid #38a169; }
+            .task-card.planned { background: #1a2333; border: 1px solid #4299e1; }
+            .task-card-top {
+              display: flex;
+              align-items: flex-start;
+              justify-content: space-between;
+              gap: 4px;
+            }
+            .task-title { font-size: 9.5px; font-weight: 600; color: #f4f4f5; }
+            .check-mark { color: #4ade80; font-weight: 800; }
+            .category-pill {
+              font-size: 7.5px;
+              font-weight: 700;
+              letter-spacing: 0.03em;
+              padding: 1px 5px;
+              border-radius: 8px;
+              white-space: nowrap;
+              flex-shrink: 0;
+            }
+            .task-meta-row {
+              display: flex;
+              flex-wrap: wrap;
+              gap: 6px;
+              margin-top: 3px;
+              font-size: 8.5px;
+              color: #a1a1aa;
+            }
+            .task-desc {
+              margin-top: 3px;
+              padding-top: 3px;
+              border-top: 1px dashed #33343c;
+              font-size: 8.5px;
+              font-style: italic;
+              color: #a1a1aa;
+            }
+
+            /* ---------- Unscheduled / additional items ---------- */
+            .section-block { margin-top: 12px; page-break-inside: avoid; }
+            .section-title {
+              font-size: 11px;
+              text-transform: uppercase;
+              letter-spacing: 0.05em;
+              color: #f4f4f5;
+              margin: 0 0 6px 0;
+            }
+            .unscheduled-grid {
+              display: grid;
+              grid-template-columns: repeat(5, 1fr);
+              gap: 8px;
+            }
+            .unscheduled-col-title {
+              font-size: 9px;
+              font-weight: 700;
+              color: #a1a1aa;
+              margin-bottom: 4px;
+              text-transform: uppercase;
+            }
+            .task-card.compact { padding: 4px 5px; }
+
+            /* ---------- Bottom summary (two-column) ---------- */
+            .summary-grid {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 12px;
+              margin-top: 14px;
+              page-break-inside: avoid;
+            }
+            .summary-box {
+              background: #181920;
+              border: 1px solid #272730;
+              border-radius: 8px;
+              padding: 10px 12px;
+            }
+            .summary-box h4 {
+              margin: 0 0 6px 0;
+              font-size: 10.5px;
+              text-transform: uppercase;
+              letter-spacing: 0.05em;
+              color: #60a5fa;
+            }
+            .summary-box ul { margin: 0; padding-left: 14px; }
+            .summary-box li {
+              font-size: 10px;
+              color: #e4e4e7;
+              margin-bottom: 4px;
+              padding-left: 2px;
+            }
+            .summary-box li::marker { color: #60a5fa; }
+            .summary-box li.empty-item { color: #71717a; font-style: italic; }
+
+            /* ---------- In-flow footer fallback ----------
+               @page margin boxes above are the spec-correct way to repeat a
+               footer + "Page X of Y" on every sheet, but Chromium's print/PDF
+               pipeline currently ignores @page margin-box content. This div
+               guarantees the footer text is visible at least once, at the end
+               of the document, in every browser. */
+            .print-footer {
+              margin-top: 10px;
+              padding-top: 6px;
+              border-top: 1px solid #272730;
+              display: flex;
+              justify-content: space-between;
+              font-size: 8.5px;
+              color: #71717a;
             }
           </style>
         </head>
         <body>
-          <h1>Malak's Weekly IT Work & Activity Report</h1>
-          <div class="sub-header">
-            <span>Week Period: <b>${weekStart}</b> to <b>${weekEnd}</b></span>
-            <span>Total Logged: <b>${totalLoggedHours.toFixed(1)}h</b></span>
-            <span>Completed: <b>${completedItemsCount}</b></span>
-            <span>Planned: <b>${plannedItemsCount}</b></span>
+          <div class="doc-header">
+            <div class="header-top">
+              <span class="badge">OFFICIAL EXECUTIVE WORK PLAN</span>
+              <span class="status-tag">${statusTag}</span>
+            </div>
+            <h1 class="doc-title">Malak's Weekly Work &amp; Operational Plan</h1>
+            <div class="doc-meta">
+              <span>${rangeLabel}</span>
+              <span class="divider">&bull;</span>
+              <span>Generated ${dateStr}</span>
+            </div>
           </div>
-          
-          ${currentWeekMeta.weekGoal ? `<div class="goal-box"><b>Weekly Goal:</b> ${currentWeekMeta.weekGoal}</div>` : ''}
-          
-          <table>
+
+          <div class="kpi-bar">
+            <div class="kpi-card"><span class="kpi-label">Total Logged Hours</span><span class="kpi-value">${totalLoggedHours.toFixed(1)}h</span></div>
+            <div class="kpi-card"><span class="kpi-label">Completed Tasks</span><span class="kpi-value">${completedItemsCount}</span></div>
+            <div class="kpi-card"><span class="kpi-label">Planned Tasks</span><span class="kpi-value">${plannedItemsCount}</span></div>
+            <div class="kpi-card"><span class="kpi-label">Completion Rate</span><span class="kpi-value">${completionRate}%</span></div>
+            <div class="kpi-card"><span class="kpi-label">Active Categories</span><span class="kpi-value">${activeCategoriesCount}</span></div>
+          </div>
+
+          ${hasGoal ? `
+          <div class="focus-banner">
+            <span class="focus-label">WEEKLY FOCUS</span>
+            <p class="focus-text">${currentWeekMeta.weekGoal}</p>
+          </div>` : ''}
+
+          <table class="schedule-grid">
             <thead>
               <tr>
                 <th>Time</th>
-                ${weekDays.map(d => `<th>${d.dayName} <br/><span style="font-weight:normal; color:#555;">${d.monthName} ${d.dayNum}</span></th>`).join('')}
+                ${weekDays.map(d => `<th>${d.dayName}<span class="day-date">${d.monthName} ${d.dayNum}</span></th>`).join('')}
               </tr>
             </thead>
             <tbody>
@@ -331,14 +680,28 @@ export const WeeklyWorkPlanView: React.FC = () => {
             </tbody>
           </table>
 
-          <div style="margin-top: 20px; font-size: 11px; color: #888; border-top: 1px solid #ddd; padding-top: 10px;">
-            <p>Generated on ${dateStr} via WorkPilot IT Engineering Ops</p>
+          ${unscheduledSection}
+
+          <div class="summary-grid">
+            <div class="summary-box">
+              <h4>Things To Do Next Week</h4>
+              <ul>${nextWeekItemsHtml}</ul>
+            </div>
+            <div class="summary-box">
+              <h4>Video Observations &amp; Notes</h4>
+              <ul>${videoObsHtml}</ul>
+            </div>
+          </div>
+
+          <div class="print-footer">
+            <span>Official Weekly IT &amp; Operational Report</span>
+            <span>Generated via WorkPilot IT Engineering Ops</span>
           </div>
         </body>
       </html>
     `;
 
-    // الحل الجذري: استخدام Iframe مخفي لطباعة المحتوى
+    // Render into a hidden iframe (avoids popup blockers) and trigger print
     const iframe = document.createElement('iframe');
     iframe.style.position = 'absolute';
     iframe.style.width = '0px';
@@ -346,17 +709,20 @@ export const WeeklyWorkPlanView: React.FC = () => {
     iframe.style.border = 'none';
     document.body.appendChild(iframe);
 
-    // كتابة المحتوى داخل الـ Iframe
     const iframeDoc = iframe.contentWindow?.document;
     if (iframeDoc) {
       iframeDoc.open();
       iframeDoc.write(htmlContent);
       iframeDoc.close();
 
-      // الانتظار قليلاً حتى يتم تحميل الصفحة ثم طباعتها
       iframe.contentWindow?.focus();
       setTimeout(() => {
         iframe.contentWindow?.print();
+        setTimeout(() => {
+          if (iframe.parentNode) {
+            document.body.removeChild(iframe);
+          }
+        }, 1000);
       }, 500);
     }
   };
@@ -708,7 +1074,15 @@ export const WeeklyWorkPlanView: React.FC = () => {
 
   return (
     <div className="p-6 space-y-6 max-w-[1600px] mx-auto select-none">
-      <style>{``}</style>
+      <style>{`
+        @media print {
+          /* Safety net if the page is printed directly (Ctrl+P) instead of
+             via the "Print / Save PDF" button above, which renders its own
+             fully-styled executive report through a hidden iframe. */
+          .no-print { display: none !important; }
+          body { background: #0f1117 !important; }
+        }
+      `}</style>
 
       {/* Outer Quick Action & Navigation Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#181920] p-5 rounded-2xl border border-[#292931] no-print shadow-lg">
